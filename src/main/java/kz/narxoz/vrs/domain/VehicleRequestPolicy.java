@@ -1,12 +1,9 @@
-package kz.narxoz.vrs;
+package kz.narxoz.vrs.domain;
 
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Правила перехода заявки из одного статуса в другой.
- */
 public class VehicleRequestPolicy {
 
     private static final Map<VehicleRequestStatus, Set<VehicleRequestStatus>> ALLOWED =

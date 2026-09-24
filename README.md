@@ -1,34 +1,40 @@
-# VehicleRequestSystem
+# Vehicle Request System
 
-## Product
+Система заявок на служебные машины: сотрудник создаёт заявку, руководитель согласует, диспетчер назначает машину.
 
-We are building a request system for company vehicles: an employee requests a car, a manager approves the request, and a dispatcher assigns a driver.
+## Статусы
 
-## Core item
+`DRAFT` → `SUBMITTED` → `APPROVED` → `ASSIGNED` → `COMPLETED`
 
-Users track a **vehicle request** —it has an identifier (`VehicleRequestId`) and a status (`VehicleRequestStatus`).
+Из `SUBMITTED` можно в `REJECTED`.
 
-Status: `DRAFT`, `SUBMITTED`, `APPROVED`, `ASSIGNED`, `COMPLETED`, `REJECTED`.
+## Правила (Lab 2)
 
-## Status table
+- `TransitionRule` — проверяет таблицу статусов (например, нельзя `DRAFT` → `APPROVED`).
+- `ClosedRequestRule` — из `COMPLETED` и `REJECTED` никуда перейти нельзя.
 
-| From | To | Allowed |
-|-----------|-----------|---------|
-| DRAFT | SUBMITTED | yes |
-| SUBMITTED | APPROVED | yes |
-| DRAFT | APPROVED | no |
-| COMPLETED | ASSIGNED | no |
+Оба реализуют интерфейс `Rule`. `VehicleRequestService` получает `Rule` через Spring.
 
-## Forbidden — why
-
-| From | To | Почему запрещено |
-|-----------|-----------|------------------|
-| DRAFT | APPROVED | Пропущено согласование: заявка не была отправлена руководителю, значит машину выдали бы без чьего-либо решения. |
-| COMPLETED | ASSIGNED | Поездка уже закрыта. Переназначение машины на закрытую заявку исказило бы отчёт по пробегу и топливу — нужна новая заявка. |
-
-## How to launch
+## Пакеты
 
 ```
-java -version   # 21
-mvn -q test
+  dto          client        handler         config
+  (JSON later) (HTTP later)  (HTTP week 9)   Application
+                                             VehicleRequestService
+       \            \            /                |
+        \            \          /           injects Rule
+         \            \        /
+                     domain
+     VehicleRequestId  VehicleRequestStatus  VehicleRequestPolicy
+     Rule  TransitionRule  ClosedRequestRule
+                   (no Spring)
+```
+
+В `domain` нет Spring.
+
+## Запуск
+
+```
+mvn -q verify
+mvn spring-boot:run
 ```

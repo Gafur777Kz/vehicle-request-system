@@ -1,9 +1,6 @@
-package kz.narxoz.vrs;
+package kz.narxoz.vrs.domain;
 
-/**
- * Идентификатор заявки на транспорт, например "VRS-1".
- * Пустой идентификатор запрещён: заявку без номера нельзя найти в системе.
- */
+
 public record VehicleRequestId(String value) {
 
     public VehicleRequestId {
