@@ -27,6 +27,17 @@
             <artifactId>spring-boot-starter</artifactId>
         </dependency>
 
+        <!-- Lab 3: только JDBC + PostgreSQL -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- JUnit 5 + Spring test (для тестов друга) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
