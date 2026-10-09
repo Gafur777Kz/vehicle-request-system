@@ -6,7 +6,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-/** Week 4: четыре строки из README. Разрешённые возвращают статус, запрещённые бросают. */
+
 class VehicleRequestPolicyTest {
 
     private final VehicleRequestPolicy policy = new VehicleRequestPolicy();

@@ -22,10 +22,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-/**
- * Week 4: исходящий порт NotificationPort замокан — тест не ходит ни в HTTP, ни в базу.
- * Без Spring-контекста: обычный unit-тест.
- */
 class VehicleRequestServiceTest {
 
     private NotificationPort notifications;

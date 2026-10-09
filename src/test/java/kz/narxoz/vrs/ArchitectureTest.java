@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** То, что лаба просит проверять grep'ом, проверяется в каждом mvn verify. */
+
 class ArchitectureTest {
 
     private static final Path DOMAIN = Path.of("src/main/java/kz/narxoz/vrs/domain");
