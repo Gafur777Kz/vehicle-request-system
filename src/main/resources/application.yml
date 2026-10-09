@@ -1,0 +1,9 @@
+# Учебный локальный адрес (дефолт ноутбука, не секрет).
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/css
+    username: css
+    password: css
+  sql:
+    init:
+      mode: never   # таблицу создаёт schema.sql (тест применяет его сам), не Spring
