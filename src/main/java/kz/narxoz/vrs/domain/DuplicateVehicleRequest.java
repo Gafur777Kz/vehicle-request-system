@@ -1,12 +1,9 @@
 package kz.narxoz.vrs.domain;
 
-/**
- * Заявка с таким номером уже есть.
- * Unchecked специально: исключение, вышедшее из @Transactional-метода, откатывает транзакцию.
- */
+// unchecked, чтобы Spring откатил транзакцию
 public class DuplicateVehicleRequest extends RuntimeException {
 
-    public DuplicateVehicleRequest(VehicleRequestNumber number) {
+    public DuplicateVehicleRequest(String number) {
         super("duplicate vehicle request: " + number);
     }
 }
