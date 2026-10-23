@@ -1,5 +1,3 @@
--- Lab 3: одна таблица, написана руками. Ничто не генерирует её за нас.
--- Статусы в CHECK совпадают с README и с VehicleRequestStatus.
 CREATE TABLE vehicle_request (
   id            uuid PRIMARY KEY,
   business_key  text NOT NULL UNIQUE,

@@ -1,17 +1,12 @@
--- Week 5: доказать откат руками в psql, до Java.
--- Запуск: psql -h localhost -U css -d css -f docs/rollback-demo.sql
--- (ON_ERROR_STOP выключен, чтобы после ошибки дойти до ROLLBACK)
-
-DROP TABLE IF EXISTS vehicle_request;
-\i src/main/resources/db/schema.sql
+-- Week 5: проверка отката руками в psql.
+-- Таблицу уже создал Flyway (V1), просто запустить приложение один раз.
+-- psql -h localhost -U css -d css -f docs/rollback-demo.sql
 
 BEGIN;
 INSERT INTO vehicle_request (id, business_key, status, purpose)
-VALUES ('11111111-1111-1111-1111-111111111111',
-        'VR-1042', 'DRAFT', 'Поездка в аэропорт');
+VALUES ('11111111-1111-1111-1111-111111111111', 'VR-1042', 'DRAFT', 'Поездка в аэропорт');
 INSERT INTO vehicle_request (id, business_key, status, purpose)
-VALUES ('22222222-2222-2222-2222-222222222222',
-        'VR-1042', 'DRAFT', 'Поездка в аэропорт ещё раз');
+VALUES ('22222222-2222-2222-2222-222222222222', 'VR-1042', 'DRAFT', 'Ещё раз');
 -- ERROR: duplicate key value violates unique constraint
 ROLLBACK;
 

@@ -1,81 +1,96 @@
 # Vehicle Request System
 
-Система заявок на служебные машины: сотрудник создаёт заявку, руководитель согласует, диспетчер назначает машину.
+## Product
 
-## Статусы
+Мы делаем систему заявок на служебные машины. Люди отслеживают заявку на машину (vehicle request).
 
-`DRAFT` → `SUBMITTED` → `APPROVED` → `ASSIGNED` → `COMPLETED`
+Сотрудник создаёт заявку, руководитель согласует, диспетчер назначает машину.
 
-Из `SUBMITTED` можно в `REJECTED`.
+## Core item
 
-### Четыре контрольных перехода (week 4, `@CsvSource`)
+Заявка на машину — `VehicleRequest`.
+
+- `VehicleRequestId` — UUID, колонка `id`
+- номер для человека `VR-1042` — колонка `business_key`
+- `VehicleRequestStatus` — статусы ниже
+- `VehicleRequestPolicy` — какие переходы разрешены
+
+Статусы: `DRAFT` → `SUBMITTED` → `APPROVED` → `ASSIGNED` → `COMPLETED`, из `SUBMITTED` можно в `REJECTED`.
+
+## Status table
 
 | Из | В | Результат |
 | --- | --- | --- |
 | `DRAFT` | `SUBMITTED` | разрешено |
 | `SUBMITTED` | `APPROVED` | разрешено |
-| `DRAFT` | `APPROVED` | запрещено → `IllegalStateException` |
-| `COMPLETED` | `DRAFT` | запрещено → `IllegalStateException` |
+| `DRAFT` | `APPROVED` | запрещено |
+| `COMPLETED` | `DRAFT` | запрещено |
 
-## Правила (Lab 2)
+Эти четыре строки проверяются в `VehicleRequestPolicyTest` через `@CsvSource`.
 
-- `TransitionRule` — проверяет таблицу статусов (например, нельзя `DRAFT` → `APPROVED`).
-- `ClosedRequestRule` — из `COMPLETED` и `REJECTED` никуда перейти нельзя.
+## Forbidden — why
 
-Оба реализуют интерфейс `Rule`. `VehicleRequestService` получает `Rule` через Spring.
+- `DRAFT` → `APPROVED`: нельзя пропустить отправку на согласование, руководитель не видел заявку.
+- `COMPLETED` → `DRAFT`: поездка уже была, машину вернули. Нужно создать новую заявку.
 
-## База данных (Lab 3)
+## Rules (Lab 2)
 
-Одна таблица `vehicle_request`, написана руками в `src/main/resources/db/schema.sql`.
+Интерфейс `Rule`, две реализации:
 
-| Колонка | Что это |
-| --- | --- |
-| `id uuid PRIMARY KEY` | суррогатный ключ, `VehicleRequestId.newId()` |
-| `business_key text NOT NULL UNIQUE` | номер для человека, `VR-1042` (`VehicleRequestNumber`) |
-| `status text NOT NULL` + `CHECK` | шесть статусов выше, ровно как в `VehicleRequestStatus` |
-| `purpose text NOT NULL` | цель поездки |
-| `created_at timestamptz` | `DEFAULT now()` |
+- `TransitionRule` — проверяет таблицу переходов через `VehicleRequestPolicy`
+- `ClosedRequestRule` — из `COMPLETED` и `REJECTED` никуда нельзя
 
-- Повторный номер → `DuplicateVehicleRequest` (unchecked, лежит в `domain`).
-- `insertTwice` — одна транзакция, второй `INSERT` падает → откат, count = **0**.
-- Второй `register` того же номера → исключение, первая заявка остаётся, count = **1**.
-- Только JDBC: ORM, генераторов схемы и REST здесь нет.
+Они соединяются в `RuleConfig` (`@Bean`), `VehicleRequestService` получает `Rule` через конструктор.
+
+## Packages
+
+```
+  dto            client                handler        config
+  (JSON later)   LogNotificationClient (HTTP week 9)  Application, RuleConfig
+                                                      VehicleRequestService (@Transactional)
+       \              \                  /                  |               \
+        \              \                /              injects Rule      persistence
+                          domain                                         VehicleRequestEntity (@Entity)
+     VehicleRequestId  VehicleRequestStatus  VehicleRequestPolicy        VehicleRequestJpa (EntityManager)
+     Rule  TransitionRule  ClosedRequestRule
+     NotificationPort  DuplicateVehicleRequest
+              (no Spring, no JPA)
+```
+
+## Database (Lab 3)
+
+Таблица создаётся миграцией Flyway `src/main/resources/db/migration/V1__create_vehicle_request.sql`.
+Hibernate таблицы не создаёт, только проверяет (`ddl-auto: validate`).
+
+- `id uuid PRIMARY KEY` — суррогатный ключ
+- `business_key text NOT NULL UNIQUE` — номер заявки
+- `status text NOT NULL` + `CHECK` с теми же шестью статусами
+- `purpose text NOT NULL` — цель поездки
+- `created_at timestamptz DEFAULT now()`
+
+Тесты (`VehicleRequestJpaTest`):
+
+- `secondStatementRollsBack` — `insertTwice`, одна транзакция, второй insert падает → откат, count = **0**
+- `secondRequestKeepsTheFirst` — второй `register` с тем же номером → `DuplicateVehicleRequest`, первая заявка остаётся, count = **1**
+
+`DuplicateVehicleRequest` — unchecked, лежит в `domain`. Ловим `DataIntegrityViolationException` после `flush()` в сервисе.
 
 Откат руками в psql: `docs/rollback-demo.sql`.
 
-## Пакеты
+## Run
 
-```
-  dto          client              handler         config
-  (JSON later) LogNotification     (HTTP week 9)   Application
-               Client                              VehicleRequestService (@Transactional)
-       \            \                 /                |              \
-        \            \               /           injects Rule      persistence
-         \            \             /           NotificationPort   VehicleRequestJdbc (JdbcTemplate, ?)
-                         domain                                     StatusColumn (enum <-> text)
-     VehicleRequestId  VehicleRequestNumber  VehicleRequestStatus
-     VehicleRequestPolicy  Rule  TransitionRule  ClosedRequestRule
-     NotificationPort  DuplicateVehicleRequest
-                   (no Spring, no java.sql)
-```
-
-## Запуск
-
-Нужен локальный PostgreSQL: база `css`, пользователь `css` / `css` на `localhost:5432`
-(учебный дефолт ноутбука, не секрет).
-
-```
-createuser -U postgres -P css        # пароль css
-createdb   -U postgres -O css css
-```
-
-или только Postgres в Docker:
+Нужен PostgreSQL на `localhost:5432`, база `css`, пользователь `css` / `css` (учебный дефолт).
 
 ```
 docker run -d --name css-pg -p 5432:5432 -e POSTGRES_USER=css -e POSTGRES_PASSWORD=css -e POSTGRES_DB=css postgres:16
 ```
 
-Тесты сами пересоздают таблицу из `schema.sql`.
+Если в базе уже есть таблица от старого JDBC-варианта, Flyway откажется запускать V1. Пересоздать базу (подключиться к `postgres`, не к `css`):
+
+```
+DROP DATABASE IF EXISTS css WITH (FORCE);
+CREATE DATABASE css OWNER css;
+```
 
 ```
 mvn -q verify
