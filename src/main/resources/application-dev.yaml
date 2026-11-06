@@ -1,0 +1,14 @@
+# ноутбук: локальный PostgreSQL, учебный пароль css/css
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/css
+    username: css
+    password: css
+  jpa:
+    show-sql: true
+
+# сосед, которому будем звонить в Lab 6. Сейчас только читаем значение
+app:
+  downstream:
+    base-url: http://localhost:9090
+    timeout: 2s

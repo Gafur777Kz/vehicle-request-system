@@ -46,7 +46,8 @@
 
 ```
   dto            client                handler        config
-  (JSON later)   LogNotificationClient (HTTP week 9)  Application, RuleConfig
+  (JSON later)   LogNotificationClient  Controller    Application, RuleConfig
+                 DownstreamProperties   ApiErrorHandler
                                                       VehicleRequestService (@Transactional)
        \              \                  /                  |               \
         \              \                /              injects Rule      persistence
@@ -77,6 +78,43 @@ Hibernate таблицы не создаёт, только проверяет (`
 
 Откат руками в psql: `docs/rollback-demo.sql`.
 
+## REST API (Lab 4)
+
+| Запрос | Ответ |
+| --- | --- |
+| `POST /api/v1/vehicle-requests` `{"businessKey":"VR-1042","purpose":"Поездка в аэропорт"}` | **201**, `Location: .../api/v1/vehicle-requests/{uuid}`, статус `DRAFT` |
+| `GET /api/v1/vehicle-requests/{uuid}` | **200**, заявка |
+| пустой `purpose` / `businessKey`, `purpose` > 120 | **400** `VALIDATION`, в тексте имя поля |
+| `GET /api/v1/vehicle-requests/VR-1042` (номер вместо UUID) | **400** `VALIDATION`, `id must be a UUID` |
+| UUID нормальный, но заявки нет | **404** `NOT_FOUND` |
+| тот же `businessKey` второй раз | **409** `DUPLICATE`, в базе так и остаётся 1 строка |
+
+`purpose` — это поле `title` из задания (цель поездки, до 120 символов).
+
+Любая ошибка — только `{"code","message","correlationId"}`. Если клиент прислал `X-Correlation-Id`, он возвращается в ответе.
+
+Кто за что отвечает:
+
+- `domain` — `VehicleRequest`, `VehicleRequestNotFound`, `DuplicateVehicleRequest`. Без Spring и без `jakarta.validation`.
+- `handler` — `VehicleRequestController` (выбирает 201), `CreateVehicleRequest` (`@NotBlank`, `@Size`), `VehicleRequestResponse`, `ApiError`, `ApiErrorHandler` (исключение → 400/404/409/415/500).
+- `persistence` — `VehicleRequestEntity`, в JSON никогда не попадает.
+
+Swagger: `http://localhost:8080/swagger-ui.html`, спецификация `/v3/api-docs`.
+
+## Config (Lab 4, неделя 10)
+
+- `application.yaml` — общее: `ddl-auto: validate`, Flyway, стектрейсы выключены, наружу только `health` и `info`. Паролей нет.
+- `application-dev.yaml` — localhost `css`/`css`, `app.downstream.base-url` = порт 9090, `timeout: 2s`. Включается по умолчанию.
+- `application-prod.yaml` — `CSS_DB_URL`, `CSS_DB_USER`, `CSS_DB_PASSWORD` из окружения, запуск с `SPRING_PROFILES_ACTIVE=prod`.
+- `DownstreamProperties` (`@ConfigurationProperties("app.downstream")`) — адрес соседа и timeout. В сеть пока не ходим, это Lab 6.
+
+`GET /actuator/health` → 200 `UP`. `/actuator/env`, `/actuator/heapdump` → 404.
+
+Тесты:
+
+- `VehicleRequestControllerTest` (`@WebMvcTest`, сервис замокан, без базы) — 201, 400, 404, 409, UUID в пути, `X-Correlation-Id`.
+- `PlatformTest` (`@SpringBootTest`, профиль `dev`) — значения из yaml, health 200, env 404, второй POST → 409 и count = 1.
+
 ## Run
 
 Нужен PostgreSQL на `localhost:5432`, база `css`, пользователь `css` / `css` (учебный дефолт).
@@ -95,4 +133,11 @@ CREATE DATABASE css OWNER css;
 ```
 mvn -q verify
 mvn spring-boot:run
+```
+
+Проверка руками:
+
+```
+curl -i -X POST localhost:8080/api/v1/vehicle-requests -H "Content-Type: application/json" -d "{\"businessKey\":\"VR-1042\",\"purpose\":\"Поездка в аэропорт\"}"
+curl -i localhost:8080/actuator/health
 ```

@@ -3,7 +3,9 @@ package kz.narxoz.vrs.config;
 import kz.narxoz.vrs.domain.DuplicateVehicleRequest;
 import kz.narxoz.vrs.domain.NotificationPort;
 import kz.narxoz.vrs.domain.Rule;
+import kz.narxoz.vrs.domain.VehicleRequest;
 import kz.narxoz.vrs.domain.VehicleRequestId;
+import kz.narxoz.vrs.domain.VehicleRequestNotFound;
 import kz.narxoz.vrs.domain.VehicleRequestStatus;
 import kz.narxoz.vrs.persistence.VehicleRequestEntity;
 import kz.narxoz.vrs.persistence.VehicleRequestJpa;
@@ -44,6 +46,26 @@ public class VehicleRequestService {
         } catch (DataIntegrityViolationException e) {
             throw new DuplicateVehicleRequest(number);
         }
+    }
+
+    // POST: новая заявка всегда начинается с DRAFT, дубль номера -> DuplicateVehicleRequest
+    // @Transactional здесь, потому что register вызывается изнутри класса (мимо прокси)
+    @Transactional
+    public VehicleRequest create(String number, String purpose) {
+        VehicleRequestId id = VehicleRequestId.newId();
+        register(id, number, purpose);
+        return new VehicleRequest(id, number, VehicleRequestStatus.DRAFT, purpose);
+    }
+
+    // GET: только читает, ничего не меняет
+    @Transactional(readOnly = true)
+    public VehicleRequest get(UUID id) {
+        VehicleRequestEntity row = requests.find(id);
+        if (row == null) {
+            throw new VehicleRequestNotFound(id.toString());
+        }
+        return new VehicleRequest(new VehicleRequestId(row.getId().toString()), row.getBusinessKey(),
+                VehicleRequestStatus.valueOf(row.getStatus()), row.getPurpose());
     }
 
     // одна транзакция, два insert с одним номером -> второй падает, откатывается всё (count = 0)
