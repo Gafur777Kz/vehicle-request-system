@@ -1,0 +1,6 @@
+# прод: всё из переменных окружения, секретов в git нет
+spring:
+  datasource:
+    url: ${CSS_DB_URL}
+    username: ${CSS_DB_USER}
+    password: ${CSS_DB_PASSWORD}
