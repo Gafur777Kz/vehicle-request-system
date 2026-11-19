@@ -9,7 +9,10 @@ import kz.narxoz.vrs.domain.VehicleRequestNotFound;
 import kz.narxoz.vrs.domain.VehicleRequestStatus;
 import kz.narxoz.vrs.persistence.VehicleRequestEntity;
 import kz.narxoz.vrs.persistence.VehicleRequestJpa;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +20,8 @@ import java.util.UUID;
 
 @Service
 public class VehicleRequestService {
+
+    private static final Logger log = LoggerFactory.getLogger(VehicleRequestService.class);
 
     private final Rule rules;
     private final NotificationPort notifications;
@@ -66,6 +71,33 @@ public class VehicleRequestService {
         }
         return new VehicleRequest(new VehicleRequestId(row.getId().toString()), row.getBusinessKey(),
                 VehicleRequestStatus.valueOf(row.getStatus()), row.getPurpose());
+    }
+
+    // отправить на согласование: DRAFT -> SUBMITTED, могут обе роли
+    @Transactional
+    public VehicleRequest submit(UUID id, String actor) {
+        return changeStatus(id, VehicleRequestStatus.SUBMITTED, actor);
+    }
+
+    // согласовать: SUBMITTED -> APPROVED, только MANAGER (второй замок после URL-правила)
+    @PreAuthorize("hasRole('MANAGER')")
+    @Transactional
+    public VehicleRequest approve(UUID id, String actor) {
+        return changeStatus(id, VehicleRequestStatus.APPROVED, actor);
+    }
+
+    // сначала правила из domain (Lab 1-2), потом новый статус в строку. Запрещено -> строка не меняется
+    private VehicleRequest changeStatus(UUID id, VehicleRequestStatus to, String actor) {
+        VehicleRequestEntity row = requests.find(id);
+        if (row == null) {
+            throw new VehicleRequestNotFound(id.toString());
+        }
+        VehicleRequestStatus from = VehicleRequestStatus.valueOf(row.getStatus());
+        move(new VehicleRequestId(row.getId().toString()), from, to);
+        row.setStatus(to.name());
+        log.info("vehicle request {} {} -> {} by {}", row.getBusinessKey(), from, to, actor);
+        return new VehicleRequest(new VehicleRequestId(row.getId().toString()), row.getBusinessKey(),
+                to, row.getPurpose());
     }
 
     // одна транзакция, два insert с одним номером -> второй падает, откатывается всё (count = 0)

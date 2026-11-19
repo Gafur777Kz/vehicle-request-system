@@ -3,10 +3,12 @@ package kz.narxoz.vrs.handler;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import kz.narxoz.vrs.config.VehicleRequestService;
 import kz.narxoz.vrs.domain.VehicleRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,6 +23,7 @@ import java.util.UUID;
 // HTTP-адаптер: принимает JSON, зовёт сервис, выбирает статус
 @RestController
 @RequestMapping("/api/v1/vehicle-requests")
+@SecurityRequirement(name = "bearer")
 public class VehicleRequestController {
 
     private final VehicleRequestService service;
@@ -50,5 +53,35 @@ public class VehicleRequestController {
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     public VehicleRequestResponse get(@PathVariable UUID id) {
         return VehicleRequestResponse.from(service.get(id));
+    }
+
+    // отправить на согласование: DRAFT -> SUBMITTED. Кто сделал - из токена, не из JSON
+    @PostMapping("/{id}/submit")
+    @ApiResponse(responseCode = "200", description = "статус SUBMITTED",
+            content = @Content(schema = @Schema(implementation = VehicleRequestResponse.class)))
+    @ApiResponse(responseCode = "401", description = "UNAUTHENTICATED",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "404", description = "NOT_FOUND",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "TRANSITION_NOT_ALLOWED",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    public VehicleRequestResponse submit(@PathVariable UUID id, Authentication auth) {
+        return VehicleRequestResponse.from(service.submit(id, auth.getName()));
+    }
+
+    // закрытое действие: согласовать SUBMITTED -> APPROVED, только MANAGER
+    @PostMapping("/{id}/approve")
+    @ApiResponse(responseCode = "200", description = "статус APPROVED",
+            content = @Content(schema = @Schema(implementation = VehicleRequestResponse.class)))
+    @ApiResponse(responseCode = "401", description = "UNAUTHENTICATED",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "403", description = "FORBIDDEN - роль EMPLOYEE",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "404", description = "NOT_FOUND",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "TRANSITION_NOT_ALLOWED",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    public VehicleRequestResponse approve(@PathVariable UUID id, Authentication auth) {
+        return VehicleRequestResponse.from(service.approve(id, auth.getName()));
     }
 }

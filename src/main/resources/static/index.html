@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Vehicle Request System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+    <div class="brand">
+        <div class="sign"><span>VRS</span></div>
+        <div>
+            <h1>Vehicle Request System</h1>
+            <p>Company car requests: an employee asks, a manager approves.</p>
+        </div>
+    </div>
+    <div class="road"></div>
+</header>
+
+<main>
+    <aside>
+        <section class="ticket" id="login-card">
+            <h2>Driver's pass</h2>
+            <form id="login-form">
+                <label>Username <input id="username" autocomplete="username" required></label>
+                <label>Password <input id="password" type="password" autocomplete="current-password" required></label>
+                <button type="submit">Log in</button>
+            </form>
+            <div class="note">
+                <b>Dev users (dev profile only)</b>
+                <div><code>employee</code> / <code>employee-dev</code></div>
+                <div><code>manager</code> / <code>manager-dev</code></div>
+            </div>
+        </section>
+
+        <section class="ticket hidden" id="session-card">
+            <h2>On duty</h2>
+            <p class="who"><span id="me-name"></span></p>
+            <p>Role: <b id="me-role"></b></p>
+            <p>Pass valid for: <b id="me-expires"></b></p>
+            <button id="logout" class="ghost">Log out</button>
+        </section>
+
+        <section class="ticket roles">
+            <h2>Roles</h2>
+            <p><span class="badge">EMPLOYEE</span> create, read, submit</p>
+            <p><span class="badge orange">MANAGER</span> all of that + approve</p>
+        </section>
+    </aside>
+
+    <div class="content">
+        <section class="ticket">
+            <h2>New trip request</h2>
+            <form id="create-form" class="row">
+                <input id="business-key" placeholder="Number, e.g. VR-5001" required>
+                <input id="purpose" placeholder="Purpose, e.g. Trip to the airport" maxlength="120" required>
+                <button type="submit">Create</button>
+            </form>
+        </section>
+
+        <section class="ticket">
+            <h2>Request route</h2>
+            <ol class="route" id="route">
+                <li data-status="DRAFT">Draft</li>
+                <li data-status="SUBMITTED">Submitted</li>
+                <li data-status="APPROVED">Approved</li>
+            </ol>
+            <div class="row">
+                <input id="request-id" placeholder="Request id (UUID), filled after Create">
+            </div>
+            <div class="row">
+                <button id="read" class="ghost">Read</button>
+                <button id="submit">Submit</button>
+                <button id="approve" class="orange">Approve - MANAGER only</button>
+            </div>
+        </section>
+
+        <section class="ticket">
+            <h2>Dispatcher log</h2>
+            <div id="result" class="result">No calls yet.</div>
+        </section>
+    </div>
+</main>
+
+<footer>CSS-3008 · Lab 5 · token is kept only in memory and never shown</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

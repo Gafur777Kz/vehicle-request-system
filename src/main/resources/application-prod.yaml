@@ -4,3 +4,8 @@ spring:
     url: ${CSS_DB_URL}
     username: ${CSS_DB_USER}
     password: ${CSS_DB_PASSWORD}
+
+# ключ JWT только из переменной окружения, значения по умолчанию нет
+app:
+  jwt:
+    secret: ${CSS_JWT_SECRET}

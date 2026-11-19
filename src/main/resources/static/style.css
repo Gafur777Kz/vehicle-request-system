@@ -1,0 +1,215 @@
+/* "дорожный" стиль: асфальт, жёлтая разметка, путевые листы */
+:root {
+    --asphalt: #2b2d31;
+    --line: #f2c230;
+    --paper: #fbf8f1;
+    --ink: #24262b;
+    --muted: #6b6f78;
+    --green: #2f855a;
+    --orange: #dd6b20;
+    --red: #c53030;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: "Trebuchet MS", Verdana, sans-serif;
+    background: #e9e5da;
+    color: var(--ink);
+}
+
+header { background: var(--asphalt); color: #fff; }
+
+.brand {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 22px 16px 18px;
+    display: flex;
+    align-items: center;
+    gap: 22px;
+}
+
+/* жёлтый "дорожный знак" ромбом */
+.sign {
+    width: 56px;
+    height: 56px;
+    background: var(--line);
+    color: var(--asphalt);
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: rotate(45deg);
+    border: 3px solid var(--asphalt);
+    outline: 2px solid var(--line);
+    flex-shrink: 0;
+}
+
+.sign span { transform: rotate(-45deg); }
+
+header h1 { margin: 0; font-size: 26px; letter-spacing: 0.5px; }
+header p { margin: 4px 0 0; color: #c9cbd1; }
+
+/* пунктирная разметка под шапкой */
+.road {
+    height: 14px;
+    background: repeating-linear-gradient(90deg, var(--line) 0 40px, transparent 40px 70px) center / 100% 4px no-repeat,
+                var(--asphalt);
+}
+
+main {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 20px 16px;
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 18px;
+}
+
+@media (max-width: 760px) {
+    main { grid-template-columns: 1fr; }
+}
+
+/* карточка как путевой лист: перфорация слева */
+.ticket {
+    background: var(--paper);
+    border-left: 6px dashed var(--line);
+    border-radius: 4px;
+    padding: 16px 18px;
+    margin-bottom: 18px;
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.08);
+}
+
+.ticket h2 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--muted);
+}
+
+.hidden { display: none; }
+
+label { display: block; margin-bottom: 10px; font-size: 14px; }
+
+input {
+    width: 100%;
+    padding: 9px 10px;
+    margin-top: 4px;
+    border: 2px solid #d8d3c4;
+    border-radius: 3px;
+    background: #fff;
+    font: inherit;
+}
+
+input:focus { outline: none; border-color: var(--asphalt); }
+
+.row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.row input { flex: 1 1 200px; margin-top: 0; }
+
+button {
+    padding: 9px 16px;
+    border: 2px solid var(--asphalt);
+    border-radius: 3px;
+    background: var(--asphalt);
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+button:hover { background: #000; }
+button.ghost { background: transparent; color: var(--asphalt); }
+button.ghost:hover { background: var(--line); }
+button.orange { background: var(--orange); border-color: var(--orange); }
+
+.note {
+    margin-top: 14px;
+    padding: 10px;
+    background: #fff4cc;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.who { font-size: 22px; font-weight: bold; margin: 0 0 6px; }
+
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    margin-right: 6px;
+    border-radius: 3px;
+    background: var(--asphalt);
+    color: #fff;
+    font-size: 12px;
+    font-family: Consolas, monospace;
+}
+
+.badge.orange { background: var(--orange); }
+.roles p { margin: 6px 0; font-size: 14px; }
+
+/* маршрут статусов: остановки на дороге */
+.route {
+    list-style: none;
+    display: flex;
+    padding: 0;
+    margin: 4px 0 18px;
+    counter-reset: stop;
+}
+
+.route li {
+    flex: 1;
+    position: relative;
+    text-align: center;
+    padding-top: 26px;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.route li::before {
+    content: "";
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    width: 14px;
+    height: 14px;
+    margin-left: -7px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid #b9b4a6;
+    z-index: 1;
+}
+
+.route li::after {
+    content: "";
+    position: absolute;
+    top: 12px;
+    left: -50%;
+    width: 100%;
+    height: 4px;
+    background: repeating-linear-gradient(90deg, #b9b4a6 0 10px, transparent 10px 16px);
+}
+
+.route li:first-child::after { display: none; }
+
+.route li.done { color: var(--ink); font-weight: bold; }
+.route li.done::before { background: var(--line); border-color: var(--asphalt); }
+.route li.done::after { background: var(--asphalt); }
+
+.result {
+    font-family: Consolas, monospace;
+    white-space: pre-wrap;
+    padding: 12px;
+    border-left: 4px solid #b9b4a6;
+    background: #fff;
+    font-size: 14px;
+}
+
+.result.ok { border-left-color: var(--green); }
+.result.error { border-left-color: var(--red); background: #fff5f5; }
+
+footer {
+    text-align: center;
+    padding: 10px 16px 24px;
+    font-size: 12px;
+    color: var(--muted);
+}

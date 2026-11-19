@@ -2,12 +2,15 @@ package kz.narxoz.vrs.handler;
 
 import jakarta.servlet.http.HttpServletRequest;
 import kz.narxoz.vrs.domain.DuplicateVehicleRequest;
+import kz.narxoz.vrs.domain.TransitionNotAllowed;
 import kz.narxoz.vrs.domain.VehicleRequestNotFound;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -15,8 +18,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-
-import java.util.UUID;
 
 // одно место, где исключение превращается в статус и ApiError
 @RestControllerAdvice
@@ -61,6 +62,24 @@ public class ApiErrorHandler {
         return error(HttpStatus.CONFLICT, "DUPLICATE", "vehicle request with this business key already exists", request);
     }
 
+    // 409: правило статусов запрещает переход, например согласовать DRAFT. Строка не меняется
+    @ExceptionHandler(TransitionNotAllowed.class)
+    ResponseEntity<ApiError> badTransition(TransitionNotAllowed e, HttpServletRequest request) {
+        return error(HttpStatus.CONFLICT, "TRANSITION_NOT_ALLOWED", e.getMessage(), request);
+    }
+
+    // 401 на логине: неизвестный пользователь и неверный пароль - один и тот же ответ
+    @ExceptionHandler(AuthenticationException.class)
+    ResponseEntity<ApiError> badLogin(HttpServletRequest request) {
+        return error(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "bad username or password", request);
+    }
+
+    // 403 от @PreAuthorize на сервисе (второй замок, если URL-правило забыли)
+    @ExceptionHandler(AccessDeniedException.class)
+    ResponseEntity<ApiError> wrongRole(HttpServletRequest request) {
+        return error(HttpStatus.FORBIDDEN, "FORBIDDEN", "not allowed for your role", request);
+    }
+
     // 405: например PUT, которого у нас нет
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     ResponseEntity<ApiError> wrongMethod(HttpServletRequest request) {
@@ -82,10 +101,6 @@ public class ApiErrorHandler {
     }
 
     private ResponseEntity<ApiError> error(HttpStatus status, String code, String message, HttpServletRequest request) {
-        String correlationId = request.getHeader("X-Correlation-Id");
-        if (correlationId == null || correlationId.isBlank()) {
-            correlationId = UUID.randomUUID().toString();
-        }
-        return ResponseEntity.status(status).body(new ApiError(code, message, correlationId));
+        return ResponseEntity.status(status).body(new ApiError(code, message, ApiError.correlationId(request)));
     }
 }
