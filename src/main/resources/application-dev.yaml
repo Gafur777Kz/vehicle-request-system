@@ -7,8 +7,11 @@ spring:
   jpa:
     show-sql: true
 
-# сосед, которому будем звонить в Lab 6. Сейчас только читаем значение
 app:
+  # сосед, которому будем звонить в Lab 6. Сейчас только читаем значение
   downstream:
     base-url: http://localhost:9090
     timeout: 2s
+  # ключ для подписи JWT (HS256), минимум 32 символа. Только для ноутбука
+  jwt:
+    secret: dev-only-vehicle-request-secret-0123456789

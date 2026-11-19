@@ -108,12 +108,73 @@ Swagger: `http://localhost:8080/swagger-ui.html`, спецификация `/v3/
 - `application-prod.yaml` — `CSS_DB_URL`, `CSS_DB_USER`, `CSS_DB_PASSWORD` из окружения, запуск с `SPRING_PROFILES_ACTIVE=prod`.
 - `DownstreamProperties` (`@ConfigurationProperties("app.downstream")`) — адрес соседа и timeout. В сеть пока не ходим, это Lab 6.
 
-`GET /actuator/health` → 200 `UP`. `/actuator/env`, `/actuator/heapdump` → 404.
+`GET /actuator/health` → 200 `UP`. `/actuator/env`, `/actuator/heapdump` закрыты (с Lab 5 без токена это 401).
 
 Тесты:
 
 - `VehicleRequestControllerTest` (`@WebMvcTest`, сервис замокан, без базы) — 201, 400, 404, 409, UUID в пути, `X-Correlation-Id`.
 - `PlatformTest` (`@SpringBootTest`, профиль `dev`) — значения из yaml, health 200, env 404, второй POST → 409 и count = 1.
+
+## Security (Lab 5)
+
+Две роли:
+
+- `EMPLOYEE` - сотрудник: создаёт, читает и отправляет заявку на согласование
+- `MANAGER` - руководитель: всё то же + **согласует** заявку (закрытое действие)
+
+### Rules table
+
+| Action | EMPLOYEE | MANAGER | No token |
+| --- | --- | --- | --- |
+| `POST /api/v1/auth/login` | anyone | anyone | allowed |
+| Create and read: `POST /api/v1/vehicle-requests`, `GET /api/v1/vehicle-requests/{id}` | yes | yes | 401 |
+| Submit: `POST /api/v1/vehicle-requests/{id}/submit` (DRAFT -> SUBMITTED) | yes | yes | 401 |
+| **Approve: `POST /api/v1/vehicle-requests/{id}/approve` (SUBMITTED -> APPROVED)** | **403** | yes | 401 |
+| `GET /api/me` | yes | yes | 401 |
+| `GET /actuator/health` | anyone | anyone | allowed |
+| Auth page `/`, `/index.html`, `/style.css`, `/app.js` | anyone | anyone | allowed |
+| Swagger `/swagger-ui.html`, `/swagger-ui/**`, `/v3/api-docs/**` | anyone | anyone | allowed |
+| Anything else (например `/actuator/env`) | 403 | 403 | 401 |
+
+Правила в `SecurityConfig` идут в том же порядке. Approve стоит **выше** `/api/v1/**`, иначе сотрудник получил бы 200.
+На методе `approve` в сервисе ещё стоит `@PreAuthorize("hasRole('MANAGER')")` - второй замок.
+
+### Login and token
+
+- `POST /api/v1/auth/login` `{"username":"employee","password":"employee-dev"}` -> `200` `{"accessToken":"eyJ...","tokenType":"Bearer","expiresIn":900}`
+- Токен HS256, `iss` = `vehicle-request-system`, живёт 15 минут, в claim `roles` роль без `ROLE_` (`["EMPLOYEE"]`)
+- Дальше каждый запрос с заголовком `Authorization: Bearer <token>`
+- Неизвестный пользователь и неверный пароль - одинаково: `401 UNAUTHENTICATED`, `bad username or password`
+
+Dev-пользователи (только профиль `dev`, пароли хранятся как BCrypt-хеш):
+
+| Username | Password | Role |
+| --- | --- | --- |
+| `employee` | `employee-dev` | EMPLOYEE |
+| `manager` | `manager-dev` | MANAGER |
+
+### Errors
+
+| Situation | Status | code | message |
+| --- | --- | --- | --- |
+| Нет токена / токен испорчен / чужая подпись / истёк / чужой `iss` | 401 | `UNAUTHENTICATED` | `valid token required` |
+| Неверный логин или пароль | 401 | `UNAUTHENTICATED` | `bad username or password` |
+| Роль не подходит (EMPLOYEE на approve) | 403 | `FORBIDDEN` | `not allowed for your role` |
+| Правило статусов запрещает переход (approve у DRAFT) | 409 | `TRANSITION_NOT_ALLOWED` | `cannot move from DRAFT to APPROVED` |
+
+Тело как в Lab 4: `code`, `message`, `correlationId`.
+
+### Secret
+
+- `application-dev.yaml`: `app.jwt.secret` - учебное значение, 42 символа
+- `application-prod.yaml`: `app.jwt.secret: ${CSS_JWT_SECRET}`, значения по умолчанию нет
+- `application.yaml`: секрета нет. Секрет короче 32 символов - приложение не стартует
+
+### Auth page
+
+`http://localhost:8080/` - наша страница (`src/main/resources/static/`), не форма Spring.
+Вход, имя и роль из `/api/me`, создать / прочитать / отправить заявку, approve (EMPLOYEE -> 403, MANAGER -> APPROVED), выход.
+Токен хранится только в переменной JavaScript.
 
 ## Run
 

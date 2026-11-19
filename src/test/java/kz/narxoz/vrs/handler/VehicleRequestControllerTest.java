@@ -1,6 +1,7 @@
 package kz.narxoz.vrs.handler;
 
 import kz.narxoz.vrs.config.Application;
+import kz.narxoz.vrs.config.SecurityConfig;
 import kz.narxoz.vrs.config.VehicleRequestService;
 import kz.narxoz.vrs.domain.DuplicateVehicleRequest;
 import kz.narxoz.vrs.domain.VehicleRequest;
@@ -9,10 +10,14 @@ import kz.narxoz.vrs.domain.VehicleRequestNotFound;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.UUID;
 
@@ -23,7 +28,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -31,8 +38,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 // только веб-слой: без PostgreSQL, сервис замокан
+// Lab 5: фильтры безопасности включены (SecurityConfig), поэтому каждый запрос идёт с токеном
 @WebMvcTest(VehicleRequestController.class)
 @ContextConfiguration(classes = Application.class)
+@Import(SecurityConfig.class)
 class VehicleRequestControllerTest {
 
     private static final String URL = "/api/v1/vehicle-requests";
@@ -43,13 +52,22 @@ class VehicleRequestControllerTest {
     @MockitoBean
     private VehicleRequestService service;
 
+    // настоящий decoder не нужен: jwt() ниже подставляет готовый "проверенный" токен
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
+
+    // токен сотрудника с ролью EMPLOYEE (ничего не подписывается)
+    private static RequestPostProcessor employee() {
+        return jwt().jwt(j -> j.subject("employee")).authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"));
+    }
+
     @Test
     void validBodyReturns201WithLocation() throws Exception {
         VehicleRequestId id = VehicleRequestId.newId();
         when(service.create("VR-1042", "Поездка в аэропорт"))
                 .thenReturn(new VehicleRequest(id, "VR-1042", DRAFT, "Поездка в аэропорт"));
 
-        mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post(URL).with(employee()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"businessKey\":\"VR-1042\",\"purpose\":\"Поездка в аэропорт\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", endsWith(URL + "/" + id.value())))
@@ -60,7 +78,7 @@ class VehicleRequestControllerTest {
 
     @Test
     void blankPurposeReturns400AndServiceIsNotCalled() throws Exception {
-        mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post(URL).with(employee()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"businessKey\":\"VR-1042\",\"purpose\":\"   \"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION"))
@@ -73,7 +91,7 @@ class VehicleRequestControllerTest {
     void purposeLongerThan120Returns400() throws Exception {
         String purpose = "a".repeat(121);
 
-        mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post(URL).with(employee()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"businessKey\":\"VR-1042\",\"purpose\":\"" + purpose + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("purpose size must be between 0 and 120"));
@@ -83,7 +101,7 @@ class VehicleRequestControllerTest {
     void duplicateReturns409() throws Exception {
         when(service.create(anyString(), anyString())).thenThrow(new DuplicateVehicleRequest("VR-1042"));
 
-        mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post(URL).with(employee()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"businessKey\":\"VR-1042\",\"purpose\":\"Ещё раз\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("DUPLICATE"));
@@ -94,14 +112,14 @@ class VehicleRequestControllerTest {
         UUID id = UUID.randomUUID();
         when(service.get(id)).thenThrow(new VehicleRequestNotFound(id.toString()));
 
-        mvc.perform(get(URL + "/" + id))
+        mvc.perform(get(URL + "/" + id).with(employee()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test
     void businessKeyInPathReturns400() throws Exception {
-        mvc.perform(get(URL + "/VR-1042"))
+        mvc.perform(get(URL + "/VR-1042").with(employee()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION"))
                 .andExpect(jsonPath("$.message").value("id must be a UUID"));
@@ -111,8 +129,19 @@ class VehicleRequestControllerTest {
 
     @Test
     void correlationIdComesBack() throws Exception {
-        mvc.perform(get(URL + "/VR-1042").header("X-Correlation-Id", "test-123"))
+        mvc.perform(get(URL + "/VR-1042").with(employee()).header("X-Correlation-Id", "test-123"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.correlationId").value("test-123"));
+    }
+
+    // Lab 5: без токена создать нельзя - 401, а не 201
+    @Test
+    void createWithoutTokenReturns401() throws Exception {
+        mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"businessKey\":\"VR-1042\",\"purpose\":\"Поездка в аэропорт\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+
+        verifyNoInteractions(service);
     }
 }

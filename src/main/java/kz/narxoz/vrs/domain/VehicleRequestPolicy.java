@@ -21,7 +21,7 @@ public class VehicleRequestPolicy {
             throw new IllegalArgumentException("Статус не может быть null");
         }
         if (!ALLOWED.get(from).contains(to)) {
-            throw new IllegalStateException("Переход " + from + " -> " + to + " запрещён");
+            throw new TransitionNotAllowed(from, to);
         }
         return to;
     }
